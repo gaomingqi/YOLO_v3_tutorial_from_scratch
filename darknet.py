@@ -214,6 +214,10 @@ class Darknet(nn.Module):
         
                 #Transform 
                 x = x.data
+                
+                # 在数据转换前保存特征映射, 用于了解多尺度feature map对不同尺寸目标检测的影响
+                # np.save("feature_map{}.npy".format(i), x)
+                
                 x = predict_transform(x, inp_dim, anchors, num_classes, CUDA)
                 if not write:              #if no collector has been intialised. 
                     detections = x
