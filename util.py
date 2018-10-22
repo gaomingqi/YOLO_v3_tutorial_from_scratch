@@ -184,6 +184,74 @@ def write_results(prediction, confidence, num_classes, nms_conf = 0.4):
     except:
         return 0
     
+def watch_results(prediction, confidence, num_classes):
+    """
+    观察NMS操作前bounding box的检测情况
+    :param prediction: 网络预测的 bounding boxes
+    :param confidence: 目标得分阈值
+    :param num_classes: 不同类别数量
+    :return: 经过目标得分过滤的boxes
+    """
+    # 目标得分阈值法
+    conf_mask = (prediction[:, :, 4] > confidence).float().unsqueeze(2)
+    prediction = prediction * conf_mask
+
+    # 变换中心点坐标+宽高的box属性 至 左上角+右下角坐标
+    box_corner = prediction.new(prediction.shape)
+    box_corner[:, :, 0] = (prediction[:, :, 0] - prediction[:, :, 2] / 2)
+    box_corner[:, :, 1] = (prediction[:, :, 1] - prediction[:, :, 3] / 2)
+    box_corner[:, :, 2] = (prediction[:, :, 0] + prediction[:, :, 2] / 2)
+    box_corner[:, :, 3] = (prediction[:, :, 1] + prediction[:, :, 3] / 2)
+    prediction[:, :, :4] = box_corner[:, :, :4]
+
+    batch_size = prediction.size(0)
+
+    write = False
+
+    for ind in range(batch_size):
+        image_pred = prediction[ind]  # image Tensor
+        # confidence threshholding
+        # NMS
+
+        max_conf, max_conf_score = torch.max(image_pred[:, 5:5 + num_classes], 1)
+        max_conf = max_conf.float().unsqueeze(1)
+        max_conf_score = max_conf_score.float().unsqueeze(1)
+        seq = (image_pred[:, :5], max_conf, max_conf_score)
+
+        # 重新组织box属性, 用最大类别概率索引与概率值取代80个类别概率
+        image_pred = torch.cat(seq, 1)
+
+        # 去除目标得分小于阈值的boxes
+        non_zero_ind = (torch.nonzero(image_pred[:, 4]))
+        try:
+            image_pred_ = image_pred[non_zero_ind.squeeze(), :].view(-1, 7)
+        except:
+            continue
+
+        if image_pred_.shape[0] == 0:
+            continue
+
+        # 为box属性添加图像 index, 去除 batch 维度
+        batch_ind = image_pred_.new(image_pred_.size(0), 1).fill_(
+            ind)  # Repeat the batch_id for as many detections of the class cls in the image
+        seq = batch_ind, image_pred_
+
+        # 如果 output 还没初始化, 就初始化它
+        if not write:
+            output = torch.cat(seq, 1)
+            write = True
+        else:
+            out = torch.cat(seq, 1)
+            output = torch.cat((output, out))
+
+    # 返回检测结果, 没经过 NMS 优化过的 box 属性
+    try:
+        return output
+    except:
+        return 0
+    
+    
+    
 def letterbox_image(img, inp_dim):
     '''resize image with unchanged aspect ratio using padding'''
     img_w, img_h = img.shape[1], img.shape[0]
