@@ -123,6 +123,9 @@ for i, batch in enumerate(im_batches):
     with torch.no_grad():
         prediction = model(Variable(batch), CUDA)
 
+    # 查看没有做NMS的目标检测结果, 目前该模块仅支持目录中只有一个测试图像的情况
+    # prediction_noNMS = watch_results(prediction, confidence, num_classes)
+        
     prediction = write_results(prediction, confidence, num_classes, nms_conf = nms_thesh)
 
     end = time.time()
@@ -218,6 +221,32 @@ print("{:25s}: {:2.3f}".format("Output Processing", class_load - output_recast))
 print("{:25s}: {:2.3f}".format("Drawing Boxes", end - draw))
 print("{:25s}: {:2.3f}".format("Average time_per_img", (end - load_batch)/len(imlist)))
 print("----------------------------------------------------------")
+
+# 绘制没有进行 NMS 的目标检测结果, 并保存
+# if type(prediction_noNMS) != int:
+#     output = prediction_noNMS
+# 
+#     im_dim_list = [(x.shape[1], x.shape[0]) for x in loaded_ims]
+#     im_dim_list = torch.FloatTensor(im_dim_list).repeat(1, 2)
+#     if CUDA:
+#         im_dim_list = im_dim_list.cuda()
+#     im_dim_list = torch.index_select(im_dim_list, 0, output[:, 0].long())
+#     scaling_factor = torch.min(416 / im_dim_list, 1)[0].view(-1, 1)
+# 
+#     output[:, [1, 3]] -= (inp_dim - scaling_factor * im_dim_list[:, 0].view(-1, 1)) / 2
+#     output[:, [2, 4]] -= (inp_dim - scaling_factor * im_dim_list[:, 1].view(-1, 1)) / 2
+# 
+#     output[:, 1:5] /= scaling_factor
+# 
+#     for i in range(output.shape[0]):
+#         output[i, [1, 3]] = torch.clamp(output[i, [1, 3]], 0.0, im_dim_list[i, 0])
+#         output[i, [2, 4]] = torch.clamp(output[i, [2, 4]], 0.0, im_dim_list[i, 1])
+# 
+#     list(map(lambda x: write(x, loaded_ims), output))
+# 
+#     det_names = pd.Series(imlist).apply(lambda x: "{}/det_noNMS_{}".format(args.det, x.split("/")[-1]))
+# 
+#     list(map(cv2.imwrite, det_names, loaded_ims))
 
 
 torch.cuda.empty_cache()
